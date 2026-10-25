@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-10-26 — sync with Anton-Barinov/php2shell-patches (5.4.45, 5.5.34, 5.6.40, 7.0.33)
+
+- Pulled the current `enhanced-universal` patches from
+  [Anton-Barinov/php2shell-patches](https://github.com/Anton-Barinov/php2shell-patches)
+  at `4c2438b` for the branches that were behind:
+  - 5.6.40: updated to the latest enhanced universal patch (adds the Chain-C
+    decode-window hardening, session-filename/`PS(serializer)` resets and the
+    `post_max_size` multipart fix on top of the previous version);
+  - 7.0.33: replaced the hand-ported 7.2.34 derivative with the full
+    7.0 enhanced-universal patch (same root-cause/session/unserialize hardening as
+    the other enhanced branches);
+  - 5.4.45 and 5.5.34: switched from the minimal official mitigation to the
+    enhanced-universal backport, so upload progress is fixed at the root instead of
+    being disabled.
+- 7.2.34, 7.3.33, 7.4.33, 8.0.30 and 8.1.34 were already byte-identical to the
+  current Anton enhanced-universal files and were left unchanged.
+- Each changed patch was verified with `patch -p1 --dry-run -F0` against the matching
+  vanilla tarball (5.4.45, 5.5.34, 5.6.40 and 7.0.33): no rejects. Builds were not
+  re-run for this sync.
+- Removed the old “7.0.33 is a hand-ported 7.2.34 patch” note from the README;
+  7.0.33 now uses the full enhanced-universal backport.
+
 ## 2026-10-22 — enhanced backports (5.6.40, 7.2.34, 7.3.33, 7.4.33, 8.0.30, 8.1.34)
 
 - Adopted the `enhanced-universal` backports from
