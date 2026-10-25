@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-26 — experimental PHP 5.1.6 hardening
+
+- Added `php-5.1.6-hardening.patch`. This is **not a CVE fix**: PHP 5.1 predates
+  `session.upload_progress` (5.4) and the affected raw-key
+  `zend_hash_str_add/update` optimization (7.3+), and is not in the published
+  affected lists. The patch is defense-in-depth only.
+- It replaces old OOM unwind paths with `zend_mm_safe_error_ex()` → `_exit(1)`,
+  unlinks temporary uploads before exit, resets request/stack/llist/session state,
+  and hardens multipart parsing: `post_max_size` cutoff, header allow-list and
+  duplicate suppression, `max_multipart_body_parts`, `size_t` in `substring_conf`,
+  and the actual-POST-length warning.
+- Verified with `patch -p1 --dry-run -F0` on vanilla PHP 5.1.6 and built as CLI with
+  `--enable-session` on CentOS 6 / GCC 4.4.7 (`make` clean). CGI/Apache were not
+  rebuilt.
+
 ## 2026-10-26 — sync with Anton-Barinov/php2shell-patches (5.4.45, 5.5.34, 5.6.40, 7.0.33)
 
 - Pulled the current `enhanced-universal` patches from
