@@ -34,6 +34,16 @@
     `Content-Length` (the 8.2.35 multipart fix).
 - The hardened 5.2.17 patch was built successfully as CLI with GCC 4.4.7 on
   CentOS 6 (`make` clean); the Apache module was not re-run.
+- Hardened 5.3.3 (vanilla) and 5.3.3-50.el6_10 the same way: `zend_stack_destroy()`
+  now clears its pointer, `php_emergency_cleanup_uploaded_files()` runs before the
+  OOM `_exit(1)`, the allocation-error helper is marked `noreturn`, session
+  `PS(id)`/`PS(serializer)` state is reset, and the actual-POST-length warning is
+  present. The vanilla patch was built as CLI with `--enable-session` on CentOS 6 /
+  GCC 4.4.7; the el6_10 patch was dry-run against the real distro prep tree after
+  its 114 spec patches. CGI/Apache builds were not re-run. The earlier 5.3 pointer
+  stack cleanup was already correct (unlike 5.2).
+- The hardened 5.2.17 patch was built successfully as CLI with GCC 4.4.7 on
+  CentOS 6 (`make` clean); the Apache module was not re-run.
 - What is intentionally not applicable to 5.2: `session.upload_progress` and the
   upload-progress root-cause/session-filename/`PS(serializer)`-during-upload
   changes (the feature does not exist in 5.2), and the upload-progress Chain-C

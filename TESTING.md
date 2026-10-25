@@ -97,12 +97,14 @@ php-cgi -q -d cgi.force_redirect=0 -d max_multipart_body_parts=1 \
 | 5.5.34 | yes | yes | yes | yes | CLI+CGI |
 | 5.6.40 | yes | yes | yes | yes | CLI+CGI, FPM build, spare-port FPM test |
 
-> The 5.4.45/5.5.34/5.6.40 rows above record builds of the earlier patches. The
-> 2026-10-26 hardened 5.2.17 patch was additionally built as CLI on CentOS 6 /
-> GCC 4.4.7 (`make` clean); its Apache module was not re-run. The enhanced-universal
-> sync for 5.4.45, 5.5.34, 5.6.40 and 7.0.33 was verified with
-> `patch -p1 --dry-run -F0` on clean vanilla tarballs; those binaries were not
-> rebuilt as part of this sync.
+> The 5.3.3 and 5.4.45/5.5.34/5.6.40 rows above record builds of the earlier
+> patches. The 2026-10-26 hardened 5.2.17 and 5.3.3 patches were built as CLI on
+> CentOS 6 / GCC 4.4.7 with `--enable-session` (`make` clean); their CGI/Apache
+> modules were not re-run. The 5.3.3-50.el6_10 patch was verified with
+> `patch -p1 --dry-run -F0` on the real distro prep tree after its 114 spec
+> patches. The enhanced-universal sync for 5.4.45, 5.5.34, 5.6.40 and 7.0.33 was
+> verified with `patch -p1 --dry-run -F0` on clean vanilla tarballs; those
+> binaries were not rebuilt as part of this sync.
 
 ## 6. What is **not** covered by these tests
 
