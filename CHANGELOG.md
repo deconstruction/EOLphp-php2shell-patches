@@ -34,6 +34,15 @@
     `Content-Length` (the 8.2.35 multipart fix).
 - The hardened 5.2.17 patch was built successfully as CLI with GCC 4.4.7 on
   CentOS 6 (`make` clean); the Apache module was not re-run.
+- Hardened 5.4.16 (the remaining minimal branch): stack cleanup pointer reset,
+  emergency upload temp cleanup before `_exit(1)`, `noreturn` allocation-error
+  helper, session `PS(id)`/`PS(serializer)` resets and the actual-POST-length
+  warning. The 5.4.16 patch still uses the minimal approach (disables
+  `session.upload_progress`); the enhanced 5.4 backport targets 5.4.45 and does not
+  apply here. CLI build with `--enable-session` on CentOS 6 / GCC 4.4.7 passed;
+  CGI/Apache were not re-run.
+- The hardened 5.2.17 patch was built successfully as CLI with GCC 4.4.7 on
+  CentOS 6 (`make` clean); the Apache module was not re-run.
 - Hardened 5.3.3 (vanilla) and 5.3.3-50.el6_10 the same way: `zend_stack_destroy()`
   now clears its pointer, `php_emergency_cleanup_uploaded_files()` runs before the
   OOM `_exit(1)`, the allocation-error helper is marked `noreturn`, session
