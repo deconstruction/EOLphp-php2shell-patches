@@ -14,7 +14,7 @@ covering end-of-life PHP 5.x–8.1 branches.
 
 | File | Version | Target | SHA-256 |
 |---|---|---|---|
-| `php-5.2.17-CVE-2026-109618-109619.patch` | 5.2.17 | mod_php (Apache DSO), vanilla tarball | `e709bf51fc51f9e54b1cc4132bc7402254658d6133b34ba1d8b9cf09900bbd9d` |
+| `php-5.2.17-CVE-2026-109618-109619.patch` | 5.2.17 | mod_php (Apache DSO), vanilla tarball; no upload_progress in 5.2 | `1294094deffa8bd046b1a1ff0d783df1149152f61afb41ad6216eb2feb944dde` |
 | `php-5.3.3-CVE-2026-109618-109619.patch` | 5.3.3 | vanilla tarball | `59163bf4630301f332f1a89c14d5c5a0702a0529b6698544b4af4bafa41575e7` |
 | `php-5.3.3-50.el6_10-CVE-2026-109618-109619.patch` | 5.3.3-50.el6_10 | CentOS/OL 6.10 distro tree (after the 114 patches from the spec) | `b07a948cfbb57e89e5d1035e170f11b3cd0ac7f65c1c21112d6a804542ad1670` |
 | `php-5.4.16-CVE-2026-109618-109619.patch` | 5.4.16 | vanilla tarball | `dd56627b130945d59b4dc37714f2f82c2b8fd58875d0faed9b1f7520a1be3133` |

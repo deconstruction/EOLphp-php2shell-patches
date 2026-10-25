@@ -21,6 +21,24 @@
   re-run for this sync.
 - Removed the old “7.0.33 is a hand-ported 7.2.34 patch” note from the README;
   7.0.33 now uses the full enhanced-universal backport.
+- Hardened the 5.2.17 patch with the applicable ideas from the newer branches:
+  - corrected the request-stack cleanup (the previous hunk cleared
+    `zend_ptr_stack.elements` inside `zend_ptr_stack_apply()`, which could crash
+    when the stack held more than one element; cleanup now happens in
+    `zend_ptr_stack_destroy()`, and `zend_stack_destroy()` also clears its pointer);
+  - added `php_emergency_cleanup_uploaded_files()` and a `ZEND_ATTRIBUTE_NORETURN`
+    declaration so an OOM `_exit(1)` unlinks temporary uploads without allocating;
+  - reset `PS(serializer)` at request shutdown and clear `PS(id)` after closing the
+    session (session state no longer leaks into the next request);
+  - warn when the actual POST body exceeds `post_max_size` despite the declared
+    `Content-Length` (the 8.2.35 multipart fix).
+- The hardened 5.2.17 patch was built successfully as CLI with GCC 4.4.7 on
+  CentOS 6 (`make` clean); the Apache module was not re-run.
+- What is intentionally not applicable to 5.2: `session.upload_progress` and the
+  upload-progress root-cause/session-filename/`PS(serializer)`-during-upload
+  changes (the feature does not exist in 5.2), and the upload-progress Chain-C
+  decode-window rewrite. The non-upload `var_destroy()` unserialize path remains
+  outside the scope of these patches, as on every other branch.
 
 ## 2026-10-22 — enhanced backports (5.6.40, 7.2.34, 7.3.33, 7.4.33, 8.0.30, 8.1.34)
 
