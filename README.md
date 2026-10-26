@@ -2,11 +2,11 @@
 
 Unofficial mitigation patches for **CVE-2026-109618 / CVE-2026-109619 / CVE-2026-115560**
 ("php2shell" / session-serializer chains) covering selected end-of-life PHP branches: 5.2, 5.3, 5.4, 5.5, 5.6, 7.0,
-7.2–7.4 and 8.0–8.1. **PHP 7.1 is not covered.** PHP 5.1.6 has a separate
+7.1–7.4 and 8.0–8.1. PHP 5.1.6 has a separate
 experimental hardening patch (not a confirmed CVE fix).
 
 > ⚠️ This is **not** a vendor fix and **not** a replacement for upgrading. PHP 5.2–7.0
-> and 7.1/7.2/7.3/7.4/8.0/8.1 are end-of-life. The 5.4.45/5.5.34/5.6.40/7.0/7.2/7.3/7.4/8.0/8.1
+> and 7.1/7.2/7.3/7.4/8.0/8.1 are end-of-life. The 5.4.45/5.5.34/5.6.40/7.0/7.1/7.2/7.3/7.4/8.0/8.1
 > patches follow the enhanced backports (root-cause fix, 8.2.35 parity); the
 > 5.2/5.3/5.4.16 ones are minimal mitigations. None of them makes an EOL branch safe.
 > The only complete fix is a supported branch: **8.2.35+ / 8.3.36+ / 8.4.27+ / 8.5.12+**.
@@ -25,6 +25,7 @@ experimental hardening patch (not a confirmed CVE fix).
 | `php-5.5.34-CVE-2026-109618-109619.patch` | 5.5.34 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `8084e5514995bea5d635cc6637159168478d020403e685a1cd5b2af780a1e547` |
 | `php-5.6.40-CVE-2026-109618-109619.patch` | 5.6.40 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `35c8fb03fb6503d0182fa9964dad6c701a7797cb654593fcf7bd5183e8cee1ba` |
 | `php-7.0.33-CVE-2026-109618-109619.patch` | 7.0.33 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `28ce9a75054c86a1425cbfb81897d671c2ae85f8635c62ae0ece506dea2015fa` |
+| `php-7.1.33-CVE-2026-109618-109619.patch` | 7.1.33 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `2cd4d089bcf51d28bf180ac8f916d73fecf79dd07010563ba35b30fc31b8faae` |
 | `php-7.2.34-CVE-2026-109618-109619.patch` | 7.2.34 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `cd2e30e705e9b0fdd9c6e51b8e7791985482050d78b9e8eb70c8e66dfb4bce2e` |
 | `php-7.3.33-CVE-2026-109618-109619.patch` | 7.3.33 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `1fb0116da44bab2c63803c53e6a3d6b183684153e5e3a45daece36121cf9c236` |
 | `php-7.4.33-CVE-2026-109618-109619.patch` | 7.4.33 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `fd0a3f874b15ab8e018fde34831a1116baa0523d35f66a73164d5c2dfb57e4ca` |
@@ -34,13 +35,14 @@ experimental hardening patch (not a confirmed CVE fix).
 Patches apply to the official `php-<version>.tar.gz` tarballs
 (museum.php.net / php.net) with `patch -p1`, no rejects, except
 `php-5.3.3-50.el6_10` (requires the prepared distro tree noted below). The 5.4.45/5.5.34/5.6.40/
-7.0/7.2/7.3/7.4/8.0/8.1 patches are the `enhanced-universal` backports from
+7.0/7.1/7.2/7.3/7.4/8.0/8.1 patches are the `enhanced-universal` backports from
 [Anton-Barinov/php2shell-patches](https://github.com/Anton-Barinov/php2shell-patches)
 (verified against the vanilla tarballs listed above); they carry the official OOM
 fix plus the root-cause upload_progress fix, so upload progress bars keep working.
 The enhanced files match Anton-Barinov/php2shell-patches current at `6436594`
 (2026-10-26; patch files unchanged since `4c2438b`); 7.2.34/7.3.33/7.4.33/8.0.30/8.1.34
-were already identical.
+were already identical. 7.1.33 is a local port of Anton's 7.1 enhanced-universal
+patch (one declaration hunk relocated to match the 7.1.33 tree).
 The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
 `session.upload_progress` feature to disable; 5.4.16 disables it (see below).
 
@@ -59,12 +61,15 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
 - **5.3.3-50.el6_10** must be applied to the prepared CentOS/OL 6.10 tree *after* the
   114 patches from the spec. It was verified with `patch -p1 --dry-run -F0` on that
   tree; no build was re-run.
-- **Build verification:** 5.1.6, 5.2.17, 5.3.3 and 5.4.16 were built as CLI with
+- **Build verification:** 5.1.6, 5.2.17, 5.3.3, 5.4.16 and 7.1.33 were built as CLI with
   `--enable-session` on CentOS 6 / GCC 4.4.7 (`make` clean). CGI/Apache modules were
   not re-run. 5.4.45, 5.5.34, 5.6.40 and 7.0.33 were apply-verified only in this
   sync. 7.2.34/7.3.33/7.4.33/8.0.30/8.1.34 were already byte-identical to the
   current Anton enhanced-universal files.
-- **PHP 7.1 is intentionally not included.** Use a 7.2+ patch or a supported branch.
+- **7.1.33** is now covered by an enhanced-universal port. Anton's 7.1 patch has a
+  declaration hunk generated against a different tree; it was moved to the real
+  `Zend/zend_alloc.h` location. The result applies with `patch -p1 -F0`; CLI build
+  was verified.
 
 ## What the patches change
 
@@ -83,12 +88,12 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
   `max_multipart_body_parts` limit that counts every part; `size_t` in `substring_conf`.
 - **`session.upload_progress`:** 5.1, 5.2 and 5.3 do not have the feature;
   5.4.16 disables it (one of the demonstrated exploit paths; progress bars stop working).
-  In the enhanced 5.4.45/5.5.34/5.6.40/7.0/7.2/7.3/7.4/8.0/8.1 patches the root
+  In the enhanced 5.4.45/5.5.34/5.6.40/7.0/7.1/7.2/7.3/7.4/8.0/8.1 patches the root
   cause is fixed instead (progress counters as `zend_long`, no dangling `zval*`),
   so upload progress keeps working.
 - **Session hardening:** the hardened minimal patches reset `PS(id)` and, where present,
   `PS(serializer)` between requests (5.1.6/5.2/5.3/5.4.16). The enhanced
-  5.4.45/5.5.34/5.6.40/7.0/7.2/7.3/7.4/8.0/8.1 patches add the upload-progress
+  5.4.45/5.5.34/5.6.40/7.0/7.1/7.2/7.3/7.4/8.0/8.1 patches add the upload-progress
   session fixes: a POST-supplied session id is ignored when
   `session.use_only_cookies=1`, the upload filename is sanitised (`NUL`, `|`, CR/LF
   removed, capped at 255 chars) before it is written into the session file, and the
@@ -145,7 +150,7 @@ catch_workers_output=yes
 - **OOM kills the worker** (FPM worker or Apache child) — that amplifies DoS and
   returns 502 for legitimately heavy requests. Monitor worker restarts.
 - **`session.upload_progress`:** 5.2/5.3 do not have it; 5.4.16 disables it. The
-  enhanced 5.4.45/5.5.34/5.6.40/7.0/7.2/7.3/7.4/8.0/8.1 patches fix it at the root
+  enhanced 5.4.45/5.5.34/5.6.40/7.0/7.1/7.2/7.3/7.4/8.0/8.1 patches fix it at the root
   and leave the feature working.
 - The OOM message goes to stderr; with `catch_workers_output=no` (FPM default) it is
   lost.

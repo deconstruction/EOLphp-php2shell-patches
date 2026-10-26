@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-26 — PHP 7.1.33 enhanced-universal port
+
+- Added `php-7.1.33-CVE-2026-109618-109619.patch`, based on Anton's
+  `php-7.1-enhanced-universal.patch`. One declaration hunk in `Zend/zend_alloc.h`
+  was generated against a different tree; it was moved to the real 7.1.33 location
+  (`zend_mm_safe_error_ex` before `END_EXTERN_C`).
+- The resulting patch applies to vanilla `php-7.1.33` with `patch -p1 -F0` and was
+  built as CLI with `--enable-session` on CentOS 6 / GCC 4.4.7 (`make` clean).
+  Runtime OOM/multipart tests were not run for this port; CGI/Apache were not
+  rebuilt.
+
 ## 2026-10-26 — audit against Anton current (6436594) and CVE-2026-115560
 
 - Re-fetched Anton-Barinov/php2shell-patches. Since `4c2438b` there are no patch-file
@@ -11,7 +22,8 @@
   incomplete-class-only decode restrictions; the 5.4.16 minimal patch blocks the
   confirmed path by disabling `session.upload_progress`; 5.1/5.2/5.3 have no
   upload-progress feature.
-- 7.1 remains intentionally uncovered. No patch files were changed by this audit.
+- 7.1 was not part of that audit; it is added in the PHP 7.1.33 port entry above.
+  No patch files were changed by that audit.
 
 ## 2026-10-26 — experimental PHP 5.1.6 hardening
 
