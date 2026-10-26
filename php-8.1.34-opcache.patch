@@ -1,0 +1,208 @@
+diff --git a/ext/opcache/ZendAccelerator.c b/ext/opcache/ZendAccelerator.c
+index 530620f6..e030b441 100644
+--- a/ext/opcache/ZendAccelerator.c
++++ b/ext/opcache/ZendAccelerator.c
+@@ -2410,6 +2410,7 @@ static zend_class_entry* zend_accel_inheritance_cache_add(zend_class_entry *ce,
+ 	}
+ 
+ 	zend_map_ptr_extend(ZCSG(map_ptr_last));
++	zend_accel_pending_ce_cache_begin();
+ 
+ #if ZEND_MM_ALIGNMENT < 8
+ 	/* Align to 8-byte boundary */
+@@ -2456,6 +2457,7 @@ static zend_class_entry* zend_accel_inheritance_cache_add(zend_class_entry *ce,
+ 	EG(errors) = NULL;
+ 
+ 	ZCSG(map_ptr_last) = CG(map_ptr_last);
++	zend_accel_pending_ce_cache_commit();
+ 
+ 	zend_shared_alloc_destroy_xlat_table();
+ 
+@@ -2780,6 +2782,9 @@ zend_result accel_post_deactivate(void)
+ 		ZCG(cwd) = NULL;
+ 	}
+ 
++	/* A persist window left through a bailout never published its slots */
++	zend_accel_pending_ce_cache_discard();
++
+ 	if (!ZCG(enabled) || !accel_startup_ok) {
+ 		return SUCCESS;
+ 	}
+diff --git a/ext/opcache/ZendAccelerator.h b/ext/opcache/ZendAccelerator.h
+index de5ec45d..72d3a239 100644
+--- a/ext/opcache/ZendAccelerator.h
++++ b/ext/opcache/ZendAccelerator.h
+@@ -225,6 +225,12 @@ typedef struct _zend_accel_globals {
+ 	/* preallocated buffer for keys */
+ 	zend_string             key;
+ 	char                    _key[MAXPATHLEN * 8];
++
++	/* CE cache slots allocated during the current persist window, keyed by the
++	 * address of the shared class name string. They are written into the
++	 * strings by zend_accel_pending_ce_cache_commit() once ZCSG(map_ptr_last)
++	 * covers them. NULL outside a persist window. */
++	HashTable              *pending_ce_cache;
+ } zend_accel_globals;
+ 
+ typedef struct _zend_string_table {
+@@ -322,7 +328,10 @@ zend_op_array *persistent_compile_file(zend_file_handle *file_handle, int type);
+ 
+ zend_string* ZEND_FASTCALL accel_new_interned_string(zend_string *str);
+ 
+-uint32_t zend_accel_get_class_name_map_ptr(zend_string *type_name);
++void zend_accel_get_class_name_map_ptr(zend_string *type_name);
++void zend_accel_pending_ce_cache_begin(void);
++void zend_accel_pending_ce_cache_commit(void);
++void zend_accel_pending_ce_cache_discard(void);
+ 
+ /* memory write protection */
+ #define SHM_PROTECT() \
+diff --git a/ext/opcache/zend_file_cache.c b/ext/opcache/zend_file_cache.c
+index 7b4b4cbb..f1b1da2b 100644
+--- a/ext/opcache/zend_file_cache.c
++++ b/ext/opcache/zend_file_cache.c
+@@ -1696,6 +1696,7 @@ zend_persistent_script *zend_file_cache_script_load(zend_file_handle *file_handl
+ 	int cache_it = 1;
+ 	unsigned int actual_checksum;
+ 	int ok;
++	size_t orig_map_ptr_last = 0;
+ 
+ 	if (!full_path) {
+ 		return NULL;
+@@ -1831,6 +1832,8 @@ zend_persistent_script *zend_file_cache_script_load(zend_file_handle *file_handl
+ 		}
+ 		memcpy(buf, mem, info.mem_size);
+ 		zend_map_ptr_extend(ZCSG(map_ptr_last));
++		orig_map_ptr_last = CG(map_ptr_last);
++		zend_accel_pending_ce_cache_begin();
+ 	} else {
+ use_process_mem:
+ 		buf = mem;
+@@ -1849,6 +1852,10 @@ use_process_mem:
+ 	} zend_end_try();
+ 	if (!ok) {
+ 		if (cache_it) {
++			/* The slots allocated by the failed unserialization are referenced
++			 * only by the abandoned buffer, so they can be reclaimed. */
++			zend_accel_pending_ce_cache_discard();
++			CG(map_ptr_last) = orig_map_ptr_last;
+ 			zend_shared_alloc_unlock();
+ 			goto use_process_mem;
+ 		} else {
+@@ -1862,6 +1869,7 @@ use_process_mem:
+ 
+ 	if (cache_it) {
+ 		ZCSG(map_ptr_last) = CG(map_ptr_last);
++		zend_accel_pending_ce_cache_commit();
+ 		script->dynamic_members.checksum = zend_accel_script_checksum(script);
+ 		script->dynamic_members.last_used = ZCG(request_time);
+ 
+diff --git a/ext/opcache/zend_persist.c b/ext/opcache/zend_persist.c
+index 49dfea34..4ff93a12 100644
+--- a/ext/opcache/zend_persist.c
++++ b/ext/opcache/zend_persist.c
+@@ -299,31 +299,78 @@ static HashTable *zend_persist_attributes(HashTable *attributes)
+ 	return ptr;
+ }
+ 
+-uint32_t zend_accel_get_class_name_map_ptr(zend_string *type_name)
++/* We delay the publishing of CE cache slots until after ZCSG(map_ptr_last) is
++ * published.
++ * CE cache slots stored in interned strings are immediately visible to other
++ * processes, so if we fail to update ZCSG(map_ptr_last) after publishing a
++ * slot (due to a bailout/exit), that slot may be re-allocated for something
++ * else by other processes. */
++void zend_accel_pending_ce_cache_begin(void)
++{
++	ZEND_ASSERT(ZCG(locked));
++
++	/* A persist window left through a bailout caught by the caller (e.g.
++	 * opcache_compile_file()) never published its slots. Drop them. */
++	zend_accel_pending_ce_cache_discard();
++
++	ZCG(pending_ce_cache) = emalloc(sizeof(HashTable));
++	zend_hash_init(ZCG(pending_ce_cache), 8, NULL, NULL, 0);
++}
++
++void zend_accel_pending_ce_cache_commit(void)
++{
++	ZEND_ASSERT(ZCG(pending_ce_cache));
++	/* Every pending slot must be covered by ZCSG(map_ptr_last) */
++	ZEND_ASSERT(ZCSG(map_ptr_last) == CG(map_ptr_last));
++
++	ZEND_HASH_FOREACH_NUM_KEY_VAL(ZCG(pending_ce_cache), zend_ulong h, zval *zv) {
++		zend_string *type_name = (zend_string*)(uintptr_t)h;
++
++		ZEND_ASSERT(!ZSTR_HAS_CE_CACHE(type_name));
++		GC_SET_REFCOUNT(type_name, (uint32_t)Z_LVAL_P(zv));
++		GC_ADD_FLAGS(type_name, IS_STR_CLASS_NAME_MAP_PTR);
++	} ZEND_HASH_FOREACH_END();
++
++	zend_accel_pending_ce_cache_discard();
++}
++
++void zend_accel_pending_ce_cache_discard(void)
++{
++	if (ZCG(pending_ce_cache)) {
++		zend_hash_destroy(ZCG(pending_ce_cache));
++		efree(ZCG(pending_ce_cache));
++		ZCG(pending_ce_cache) = NULL;
++	}
++}
++
++void zend_accel_get_class_name_map_ptr(zend_string *type_name)
+ {
+ 	uint32_t ret;
++	zval *slot;
+ 
+ 	if (zend_string_equals_literal_ci(type_name, "self") ||
+ 			zend_string_equals_literal_ci(type_name, "parent")) {
+-		return 0;
++		return;
+ 	}
+ 
+ 	/* We use type.name.gc.refcount to keep map_ptr of corresponding type */
+ 	if (ZSTR_HAS_CE_CACHE(type_name)) {
+-		return GC_REFCOUNT(type_name);
++		return;
+ 	}
+ 
+ 	if ((GC_FLAGS(type_name) & GC_IMMUTABLE)
+ 	 && (GC_FLAGS(type_name) & IS_STR_PERMANENT)) {
++		ZEND_ASSERT(ZCG(pending_ce_cache) && "Must be called inside a persist window");
++		slot = zend_hash_index_lookup(ZCG(pending_ce_cache), (zend_ulong)(uintptr_t)type_name);
++		if (Z_TYPE_P(slot) != IS_NULL) {
++			/* Already allocated earlier in this window */
++			return;
++		}
+ 		do {
+ 			ret = ZEND_MAP_PTR_NEW_OFFSET();
+ 		} while (ret <= 2);
+-		GC_SET_REFCOUNT(type_name, ret);
+-		GC_ADD_FLAGS(type_name, IS_STR_CLASS_NAME_MAP_PTR);
+-		return ret;
++		ZVAL_LONG(slot, ret);
+ 	}
+-
+-	return 0;
+ }
+ 
+ static HashTable *zend_persist_backed_enum_table(HashTable *backed_enum_table)
+@@ -1312,6 +1359,9 @@ zend_persistent_script *zend_accel_script_persist(zend_persistent_script *script
+ #endif
+ 
+ 	zend_map_ptr_extend(ZCSG(map_ptr_last));
++	if (for_shm) {
++		zend_accel_pending_ce_cache_begin();
++	}
+ 
+ 	zend_accel_persist_class_table(&script->script.class_table);
+ 	zend_hash_persist(&script->script.function_table);
+@@ -1336,6 +1386,7 @@ zend_persistent_script *zend_accel_script_persist(zend_persistent_script *script
+ 
+ 	if (for_shm) {
+ 		ZCSG(map_ptr_last) = CG(map_ptr_last);
++		zend_accel_pending_ce_cache_commit();
+ 	}
+ 
+ #ifdef HAVE_JIT

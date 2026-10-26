@@ -32,6 +32,7 @@ experimental hardening patches (not confirmed CVE fixes).
 | `php-7.4.33-CVE-2026-109618-109619.patch` | 7.4.33 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `fd0a3f874b15ab8e018fde34831a1116baa0523d35f66a73164d5c2dfb57e4ca` |
 | `php-8.0.30-CVE-2026-109618-109619.patch` | 8.0.30 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `4b70292bb7a4a8f23ced14e29f0e109fb8920da05ec39054ef2fec2db83d6325` |
 | `php-8.1.34-CVE-2026-109618-109619.patch` | 8.1.34 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `1bb15cc59aff2d3f8b2e7378443e5f0ec72357a5ca3b2b801c4881cbb7bfab08` |
+| `php-8.1.34-opcache.patch` | 8.1.34 | OPcache extension; apply alongside the 8.1.34 core patch | `6f17468feebebef94180833954cf2bfedeae7a54e160286762f9dd80c08beb8a` |
 
 Patches apply to the official `php-<version>.tar.gz` tarballs
 (museum.php.net / php.net) with `patch -p1`, no rejects, except
@@ -49,6 +50,12 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
 
 ## Compatibility and verification notes
 
+- **8.1.34 OPcache:** `php-8.1.34-opcache.patch` is extracted from PHP's official
+  `PHP-8.1-CVE-2026-109618-109619` branch, commit `1d7dec17` (four files under
+  `ext/opcache`). Apply it
+  together with the 8.1.34 core patch. The official 7.4/8.0 CVE branches contain no
+  corresponding OPcache changes; older branches have no port. For those, keep
+  `opcache.enable=0` unless the residual risk is accepted.
 - **PHP 5.0.5 and 5.1.6 are not CVE fixes.** These branches predate
   `session.upload_progress` (5.4) and the raw-key `zend_hash_str_add/update`
   optimization associated with CVE-2026-109618 (7.3+). They are not in the published
@@ -63,11 +70,13 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
 - **5.3.3-50.el6_10** must be applied to the prepared CentOS/OL 6.10 tree *after* the
   114 patches from the spec. It was verified with `patch -p1 --dry-run -F0` on that
   tree; no build was re-run.
-- **Build verification:** 5.0.5, 5.1.6, 5.2.17, 5.3.3, 5.4.16 and 7.1.33 were built as CLI with
+- **Build verification:** 5.0.5, 5.0.5, 5.1.6, 5.2.17, 5.3.3, 5.4.16 and 7.1.33 were built as CLI with
   `--enable-session` on CentOS 6 / GCC 4.4.7 (`make` clean). CGI/Apache modules were
   not re-run. 5.4.45, 5.5.34, 5.6.40 and 7.0.33 were apply-verified only in this
   sync. 7.2.34/7.3.33/7.4.33/8.0.30/8.1.34 were already byte-identical to the
   current Anton enhanced-universal files.
+- **8.1.34 core + OPcache** were built together as CLI (`--disable-opcache-jit`)
+  on AlmaLinux 9 / GCC 8.5; `make` completed cleanly.
 - **7.1.33** is now covered by an enhanced-universal port. Anton's 7.1 patch has a
   declaration hunk generated against a different tree; it was moved to the real
   `Zend/zend_alloc.h` location. The result applies with `patch -p1 -F0`; CLI build
@@ -140,9 +149,10 @@ catch_workers_output=yes
 
 ## Known limitations
 
-- **OPcache is not patched.** The official fix touches `ext/opcache`
-  (`ZendAccelerator.c`, `zend_persist.c`, `zend_file_cache.c`); these patches do not.
-  With `opcache.enable=1` part of CVE-2026-109619 may remain reachable.
+- **OPcache is not part of the core patches.** For 8.1.34 a separate official
+  OPcache patch is included; apply it with the core patch. The official 7.4/8.0 CVE
+  branches have no corresponding OPcache changes, and older EOL branches have no
+  port: keep `opcache.enable=0` there or accept the residual risk.
 - **Non-OOM `E_ERROR` paths are not covered.** About 288 sites in `php_error_cb` still
   go through `zend_bailout()`. The patches only change OOM and overflow paths.
 - **`_exit` skips shutdown:** shutdown functions, destructors, session writes and

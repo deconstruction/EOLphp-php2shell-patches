@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-26 — separate OPcache patch for PHP 8.1.34
+
+- Added `php-8.1.34-opcache.patch`, extracted from the official PHP
+  `PHP-8.1-CVE-2026-109618-109619` branch at commit `1d7dec17`. It contains the four `ext/opcache`
+  changes (`ZendAccelerator.c/.h`, `zend_file_cache.c`, `zend_persist.c`) that
+  prevent a persist window left by a bailout from publishing/reusing CE cache slots.
+- Applies to vanilla `php-8.1.34` with `patch -p1 -F0`, alongside the core 8.1.34
+  patch. Both patches + OPcache were built as CLI with `--enable-opcache
+  --disable-opcache-jit` on AlmaLinux 9 / GCC 8.5 (`make` clean); OPcache runtime
+  tests were not run.
+- The official 7.4/8.0 CVE branches contain no corresponding OPcache changes. No
+  OPcache port is provided for older EOL branches; disable OPcache there.
+
 ## 2026-10-26 — experimental PHP 5.0.5 hardening
 
 - Added `php-5.0.5-hardening.patch`. This is **not a CVE fix**: PHP 5.0.5 predates

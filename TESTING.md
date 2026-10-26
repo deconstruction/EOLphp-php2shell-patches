@@ -99,12 +99,17 @@ php-cgi -q -d cgi.force_redirect=0 -d max_multipart_body_parts=1 \
 | 5.5.34 | yes | yes | yes | yes | CLI+CGI |
 | 5.6.40 | yes | yes | yes | yes | CLI+CGI, FPM build, spare-port FPM test |
 | 7.1.33 | yes | yes (CLI) | not run | not run | Enhanced port; declaration hunk relocated |
+| 8.1.34 + OPcache | yes | yes (CLI, JIT off) | not run | not run | Official OPcache patch; apply with core |
 
-> The 5.3.3/5.4.16/5.4.45/5.5.34/5.6.40 rows above record builds of the earlier
-> patches. The 2026-10-26 hardened 5.0.5, 5.1.6, 5.2.17, 5.3.3 and 5.4.16 patches, plus the 7.1.33 port, were
-> built as CLI on CentOS 6 / GCC 4.4.7 with `--enable-session` (`make` clean); their
-> CGI/Apache modules were not re-run. 5.1.6 has no confirmed php2shell vector; its
-> patch is experimental defense-in-depth. The 5.3.3-50.el6_10 patch was verified with
+> The 5.0.5/5.1.6/5.3.3/5.4.16/5.4.45/5.5.34/5.6.40 rows above record builds of
+> earlier or experimental patches. The 2026-10-26 hardened 5.0.5, 5.1.6, 5.2.17,
+> 5.3.3 and 5.4.16 patches, plus the 7.1.33 port, were built as CLI on CentOS 6 /
+> GCC 4.4.7 with `--enable-session` (`make` clean); their CGI/Apache modules were
+> not re-run.
+> The 8.1.34 core + OPcache combination was built as CLI with
+> `--disable-opcache-jit` on AlmaLinux 9 / GCC 8.5; OPcache runtime tests were not
+> run. 5.0.5 and 5.1.6 have no confirmed php2shell vector; those patches are
+> experimental defense-in-depth. The 5.3.3-50.el6_10 patch was verified with
 > `patch -p1 --dry-run -F0` on the real distro prep tree after its 114 spec
 > patches. The enhanced-universal sync for 5.4.45, 5.5.34, 5.6.40 and 7.0.33 was
 > verified with `patch -p1 --dry-run -F0` on clean vanilla tarballs; those
@@ -113,8 +118,9 @@ php-cgi -q -d cgi.force_redirect=0 -d max_multipart_body_parts=1 \
 ## 6. What is **not** covered by these tests
 
 - No RCE PoC was executed, by design.
-- OPcache-specific paths were not tested: the patches do not touch `ext/opcache`, so
-  keep `opcache.enable=0` while this mitigation is in place.
+- OPcache: the separate 8.1.34 OPcache patch compiled, but its runtime paths were not
+  tested. Other branches do not include an OPcache port; keep `opcache.enable=0`
+  there while using the core patches.
 - Non-OOM `E_ERROR` paths (about 288 call sites) are unchanged and were not retested.
 - Long-running load tests and fuzzing of the multipart parser were not performed;
   treat the parser changes as hardening, not as a audited rewrite.
