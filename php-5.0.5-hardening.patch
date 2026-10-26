@@ -1,0 +1,468 @@
+diff --git a/Zend/zend_alloc.c b/Zend/zend_alloc.c
+index 0abe9d9..143c3cf 100644
+--- a/Zend/zend_alloc.c
++++ b/Zend/zend_alloc.c
+@@ -79,9 +79,9 @@ static long mem_block_end_magic = MEM_BLOCK_END_MAGIC;
+ 									if (EG(in_execution) && AG(memory_limit)+1048576 > AG(allocated_memory)) { \
+ 										AG(memory_limit) = AG(allocated_memory) + 1048576; \
+ 										if (file) { \
+-											zend_error(E_ERROR,"Allowed memory size of %d bytes exhausted at %s:%d (tried to allocate %d bytes)", php_mem_limit, file, lineno, s); \
++											zend_mm_safe_error_ex("Allowed memory size of %d bytes exhausted at %s:%d (tried to allocate %d bytes)", php_mem_limit, file, lineno, s); \
+ 										} else { \
+-											zend_error(E_ERROR,"Allowed memory size of %d bytes exhausted (tried to allocate %d bytes)", php_mem_limit, s); \
++											zend_mm_safe_error_ex("Allowed memory size of %d bytes exhausted (tried to allocate %d bytes)", php_mem_limit, s); \
+ 										} \
+ 									} else { \
+ 										if (file) { \
+@@ -188,14 +188,7 @@ ZEND_API void *_emalloc(size_t size ZEND_FILE_LINE_DC ZEND_FILE_LINE_ORIG_DC)
+ 	HANDLE_BLOCK_INTERRUPTIONS();
+ 
+ 	if (!p) {
+-		fprintf(stderr,"FATAL:  emalloc():  Unable to allocate %ld bytes\n", (long) size);
+-#if ZEND_DEBUG && defined(HAVE_KILL) && defined(HAVE_GETPID)
+-		kill(getpid(), SIGSEGV);
+-#else
+-		exit(1);
+-#endif
+-		HANDLE_UNBLOCK_INTERRUPTIONS();
+-		return (void *)p;
++		zend_mm_safe_error_ex("FATAL: emalloc(): Unable to allocate %ld bytes", (long) size);
+ 	}
+ 	p->cached = 0;
+ 	ADD_POINTER_TO_LIST(p);
+@@ -240,7 +233,7 @@ ZEND_API void *_safe_emalloc(size_t nmemb, size_t size, size_t offset ZEND_FILE_
+ 		}
+ 	}
+ 
+-	zend_error(E_ERROR, "Possible integer overflow in memory allocation (%zd * %zd + %zd)", nmemb, size, offset);
++	zend_mm_safe_error_ex("Possible integer overflow in memory allocation (%zd * %zd + %zd)", nmemb, size, offset);
+ 	return 0;
+ }
+ 
+@@ -346,12 +339,7 @@ ZEND_API void *_erealloc(void *ptr, size_t size, int allow_failure ZEND_FILE_LIN
+ 	p = (zend_mem_header *) ZEND_DO_REALLOC(p, sizeof(zend_mem_header)+MEM_HEADER_PADDING+SIZE+END_MAGIC_SIZE);
+ 	if (!p) {
+ 		if (!allow_failure) {
+-			fprintf(stderr,"FATAL:  erealloc():  Unable to allocate %ld bytes\n", (long) size);
+-#if ZEND_DEBUG && HAVE_KILL && HAVE_GETPID
+-			kill(getpid(), SIGSEGV);
+-#else
+-			exit(1);
+-#endif
++			zend_mm_safe_error_ex("FATAL: erealloc(): Unable to allocate %ld bytes", (long) size);
+ 		}
+ 		ADD_POINTER_TO_LIST(orig);
+ 		HANDLE_UNBLOCK_INTERRUPTIONS();
+diff --git a/Zend/zend_llist.c b/Zend/zend_llist.c
+index 6af49a5..e57551d 100644
+--- a/Zend/zend_llist.c
++++ b/Zend/zend_llist.c
+@@ -117,6 +117,8 @@ ZEND_API void zend_llist_destroy(zend_llist *l)
+ 		current = next;
+ 	}
+ 
++	l->head = NULL;
++	l->tail = NULL;
+ 	l->count = 0;
+ }
+ 
+diff --git a/Zend/zend_mm.c b/Zend/zend_mm.c
+index 722b57d..129017e 100644
+--- a/Zend/zend_mm.c
++++ b/Zend/zend_mm.c
+@@ -22,6 +22,27 @@
+ #include "zend.h"
+ #include "zend_mm.h"
+ 
++#include <stdarg.h>
++
++/* Implemented in main/rfc1867.c. Must not allocate memory. */
++extern void php_emergency_cleanup_uploaded_files(TSRMLS_D);
++
++ZEND_API ZEND_ATTRIBUTE_NORETURN void zend_mm_safe_error_ex(const char *format, ...)
++{
++	va_list args;
++
++	TSRMLS_FETCH();
++	va_start(args, format);
++	vfprintf(stderr, format, args);
++	va_end(args);
++	fputc('\n', stderr);
++#ifdef PHP_WIN32
++	fflush(stderr);
++#endif
++	php_emergency_cleanup_uploaded_files(TSRMLS_C);
++	_exit(1);
++}
++
+ #if WIN32|WINNT
+ # ifndef inline
+ #  define inline __inline
+@@ -319,12 +340,12 @@ zend_mm_finished_searching_for_block:
+ 		if (true_size > (heap->block_size - ZEND_MM_ALIGNED_SEGMENT_SIZE - ZEND_MM_ALIGNED_HEADER_SIZE)) {
+ 			/* Make sure we add a memory block which is big enough */
+ 			if (zend_mm_add_memory_block(heap, true_size + ZEND_MM_ALIGNED_SEGMENT_SIZE + ZEND_MM_ALIGNED_HEADER_SIZE)) {
+-				zend_error(E_ERROR, "Out of memory: cannot allocate %zd bytes!", true_size);
++				zend_mm_safe_error_ex("Out of memory: cannot allocate %zd bytes!", true_size);
+ 				return NULL;
+ 			}
+ 		} else {
+ 			if (zend_mm_add_memory_block(heap, heap->block_size)) {
+-				zend_error(E_ERROR, "Out of memory: cannot allocate %zd bytes!", heap->block_size);
++				zend_mm_safe_error_ex("Out of memory: cannot allocate %zd bytes!", heap->block_size);
+ 				return NULL;
+ 			}
+ 		}
+diff --git a/Zend/zend_mm.h b/Zend/zend_mm.h
+index 0451db0..ae14aac 100644
+--- a/Zend/zend_mm.h
++++ b/Zend/zend_mm.h
+@@ -74,6 +74,13 @@ void *zend_mm_alloc(zend_mm_heap *heap, size_t size);
+ void zend_mm_free(zend_mm_heap *heap, void *p);
+ void *zend_mm_realloc(zend_mm_heap *heap, void *p, size_t size);
+ 
++#if defined(__GNUC__)
++# define ZEND_ATTRIBUTE_NORETURN __attribute__((__noreturn__))
++#else
++# define ZEND_ATTRIBUTE_NORETURN
++#endif
++ZEND_API ZEND_ATTRIBUTE_NORETURN void zend_mm_safe_error_ex(const char *format, ...);
++
+ #endif /* _ZEND_MM_H */
+ 
+ /*
+diff --git a/Zend/zend_operators.c b/Zend/zend_operators.c
+index f75320a..739c261 100644
+--- a/Zend/zend_operators.c
++++ b/Zend/zend_operators.c
+@@ -1166,7 +1166,12 @@ ZEND_API int concat_function(zval *result, zval *op1, zval *op2 TSRMLS_DC)
+ 		op2 = &op2_copy;
+ 	}
+ 	if (result==op1) {	/* special case, perform operations on result */
+-		uint res_len = op1->value.str.len + op2->value.str.len;
++		uint res_len;
++		if (op1->value.str.len < 0 || op2->value.str.len < 0
++				|| (int) (op1->value.str.len + op2->value.str.len) < 0) {
++			zend_mm_safe_error_ex("String size overflow");
++		}
++		res_len = op1->value.str.len + op2->value.str.len;
+ 		
+ 		if (result->value.str.len == 0) { /* handle empty_string */
+ 			STR_FREE(result->value.str.val);
+@@ -1178,6 +1183,10 @@ ZEND_API int concat_function(zval *result, zval *op1, zval *op2 TSRMLS_DC)
+ 		result->value.str.val[res_len]=0;
+ 		result->value.str.len = res_len;
+ 	} else {
++		if (op1->value.str.len < 0 || op2->value.str.len < 0
++				|| (int) (op1->value.str.len + op2->value.str.len) < 0) {
++			zend_mm_safe_error_ex("String size overflow");
++		}
+ 		result->value.str.len = op1->value.str.len + op2->value.str.len;
+ 		result->value.str.val = (char *) emalloc(result->value.str.len + 1);
+ 		memcpy(result->value.str.val, op1->value.str.val, op1->value.str.len);
+diff --git a/Zend/zend_ptr_stack.c b/Zend/zend_ptr_stack.c
+index 7280bc2..1416ea3 100644
+--- a/Zend/zend_ptr_stack.c
++++ b/Zend/zend_ptr_stack.c
+@@ -76,7 +76,11 @@ ZEND_API void zend_ptr_stack_destroy(zend_ptr_stack *stack)
+ {
+ 	if (stack->elements) {
+ 		efree(stack->elements);
++		stack->elements = NULL;
+ 	}
++	stack->top = 0;
++	stack->max = 0;
++	stack->top_element = NULL;
+ }
+ 
+ 
+diff --git a/Zend/zend_stack.c b/Zend/zend_stack.c
+index 62909e9..1bacae5 100644
+--- a/Zend/zend_stack.c
++++ b/Zend/zend_stack.c
+@@ -102,7 +102,10 @@ ZEND_API int zend_stack_destroy(zend_stack *stack)
+ 
+ 	if (stack->elements) {
+ 		efree(stack->elements);
++		stack->elements = NULL;
+ 	}
++	stack->top = 0;
++	stack->max = 0;
+ 	return SUCCESS;
+ }
+ 
+diff --git a/Zend/zend_strtod.c b/Zend/zend_strtod.c
+index 87d7550..33e9459 100644
+--- a/Zend/zend_strtod.c
++++ b/Zend/zend_strtod.c
+@@ -414,6 +414,9 @@ Balloc
+ 	else {
+ 		x = 1 << k;
+ 		rv = (Bigint *)MALLOC(sizeof(Bigint) + (x-1)*sizeof(Long));
++		if (!rv) {
++			zend_mm_safe_error_ex("Balloc() failed to allocate memory");
++		}
+ 		rv->k = k;
+ 		rv->maxwds = x;
+ 		}
+diff --git a/ext/session/session.c b/ext/session/session.c
+index 37e56fd..d1c29f1 100644
+--- a/ext/session/session.c
++++ b/ext/session/session.c
+@@ -1749,6 +1749,7 @@ static void php_rshutdown_session_globals(TSRMLS_D)
+ 	}
+ 	if (PS(id)) {
+ 		efree(PS(id));
++		PS(id) = NULL;
+ 	}
+ }
+ 
+diff --git a/main/SAPI.c b/main/SAPI.c
+index f7de3a2..97b3fef 100644
+--- a/main/SAPI.c
++++ b/main/SAPI.c
+@@ -392,6 +392,7 @@ SAPI_API void sapi_deactivate(TSRMLS_D)
+ 	zend_llist_destroy(&SG(sapi_headers).headers);
+ 	if (SG(request_info).post_data) {
+ 		efree(SG(request_info).post_data);
++		SG(request_info).post_data = NULL;
+ 	}  else 	if (SG(server_context)) {
+ 		if(sapi_module.read_post) { 
+ 			/* make sure we've consumed all request input data */
+@@ -405,18 +406,23 @@ SAPI_API void sapi_deactivate(TSRMLS_D)
+ 	}
+ 	if (SG(request_info).raw_post_data) {
+ 		efree(SG(request_info).raw_post_data);
++		SG(request_info).raw_post_data = NULL;
+ 	} 
+ 	if (SG(request_info).auth_user) {
+ 		efree(SG(request_info).auth_user);
++		SG(request_info).auth_user = NULL;
+ 	}
+ 	if (SG(request_info).auth_password) {
+ 		efree(SG(request_info).auth_password);
++		SG(request_info).auth_password = NULL;
+ 	}
+ 	if (SG(request_info).content_type_dup) {
+ 		efree(SG(request_info).content_type_dup);
++		SG(request_info).content_type_dup = NULL;
+ 	}
+ 	if (SG(request_info).current_user) {
+ 		efree(SG(request_info).current_user);
++		SG(request_info).current_user = NULL;
+ 	}
+ 	if (sapi_module.deactivate) {
+ 		sapi_module.deactivate(TSRMLS_C);
+diff --git a/main/main.c b/main/main.c
+index 9f040fa..8ca8d0f 100644
+--- a/main/main.c
++++ b/main/main.c
+@@ -319,6 +319,7 @@ PHP_INI_BEGIN()
+ 	PHP_INI_ENTRY("mail.force_extra_parameters",NULL,		PHP_INI_SYSTEM|PHP_INI_PERDIR,		NULL)
+ 	PHP_INI_ENTRY("disable_functions",			"",			PHP_INI_SYSTEM,		NULL)
+ 	PHP_INI_ENTRY("disable_classes",			"",			PHP_INI_SYSTEM,		NULL)
++	PHP_INI_ENTRY("max_multipart_body_parts",	"-1",			PHP_INI_SYSTEM|PHP_INI_PERDIR,		NULL)
+ 
+ 	STD_PHP_INI_BOOLEAN("allow_url_fopen",		"1",		PHP_INI_SYSTEM,		OnUpdateBool,			allow_url_fopen,			php_core_globals,	core_globals)
+ 	STD_PHP_INI_BOOLEAN("always_populate_raw_post_data",		"0",		PHP_INI_SYSTEM|PHP_INI_PERDIR,		OnUpdateBool,			always_populate_raw_post_data,			php_core_globals,	core_globals)
+@@ -1147,6 +1148,7 @@ void php_request_shutdown_for_hook(void *dummy)
+ 		for (i = 0; i < NUM_TRACK_VARS; i++) {
+ 			if (PG(http_globals)[i]) {
+ 				zval_ptr_dtor(&PG(http_globals)[i]);
++				PG(http_globals)[i] = NULL;
+ 			}
+ 		}
+ 	} zend_end_try();
+@@ -1213,6 +1215,7 @@ void php_request_shutdown(void *dummy)
+ 		for (i=0; i<NUM_TRACK_VARS; i++) {
+ 			if (PG(http_globals)[i]) {
+ 				zval_ptr_dtor(&PG(http_globals)[i]);
++				PG(http_globals)[i] = NULL;
+ 			}
+ 		}
+ 	} zend_end_try();
+@@ -1240,6 +1243,9 @@ void php_request_shutdown(void *dummy)
+ 		zend_unset_timeout(TSRMLS_C);
+ 	} zend_end_try();
+ 
++	/* May be accessed before php_request_startup() */
++	PG(modules_activated) = 0;
++
+ #ifdef PHP_WIN32
+ 	CoUninitialize();
+ #endif
+diff --git a/main/rfc1867.c b/main/rfc1867.c
+index fbed35c..91229a9 100644
+--- a/main/rfc1867.c
++++ b/main/rfc1867.c
+@@ -32,6 +32,7 @@
+ #include "php_globals.h"
+ #include "php_variables.h"
+ #include "rfc1867.h"
++#include "zend_ini.h"
+ 
+ #define DEBUG_FILE_UPLOAD ZEND_DEBUG
+ 
+@@ -269,6 +270,23 @@ void destroy_uploaded_files_hash(TSRMLS_D)
+ 	FREE_HASHTABLE(SG(rfc1867_uploaded_files));
+ }
+ 
++/* Unlink temporary upload files without using the allocator.
++ * Called right before _exit(1) on OOM, where normal request shutdown
++ * (and destroy_uploaded_files_hash) never runs. */
++void php_emergency_cleanup_uploaded_files(TSRMLS_D)
++{
++	Bucket *p;
++
++	if (!SG(rfc1867_uploaded_files)) {
++		return;
++	}
++	for (p = SG(rfc1867_uploaded_files)->pListHead; p; p = p->pListNext) {
++		if (p->nKeyLength) {
++			VCWD_UNLINK(p->arKey);
++		}
++	}
++}
++
+ 
+ /*
+  *  Following code is based on apache_multipart_buffer.c from libapreq-0.33 package.
+@@ -314,6 +332,12 @@ static int fill_buffer(multipart_buffer *self TSRMLS_DC)
+ 
+ 	self->buf_begin = self->buffer;
+ 
++	/* Do not keep reading a multipart body that already exceeded post_max_size.
++	 * A request without a usable Content-Length skips the check above. */
++	if (SG(post_max_size) > 0 && SG(read_post_bytes) > SG(post_max_size)) {
++		return 0;
++	}
++
+ 	/* calculate the free space in the buffer */
+ 	bytes_to_read = self->bufsize - self->bytes_in_buffer;
+ 
+@@ -466,12 +490,21 @@ static int find_boundary(multipart_buffer *self, char *boundary TSRMLS_DC)
+ }
+ 
+ 
++static zend_bool php_mime_should_save_hdr(const char *name)
++{
++	return !strcasecmp(name, "Content-Disposition")
++		|| !strcasecmp(name, "Content-Type");
++}
++
++static char *php_mime_get_hdr_value(zend_llist header, char *key);
++
+ /* parse headers */
+ static int multipart_buffer_headers(multipart_buffer *self, zend_llist *header TSRMLS_DC)
+ {
+ 	char *line;
+ 	mime_header_entry prev_entry, entry;
+ 	int prev_len, cur_len;
++	zend_bool skip = 0;
+ 	
+ 	/* didn't find boundary, abort */
+ 	if (!find_boundary(self, self->boundary TSRMLS_CC)) {
+@@ -494,11 +527,23 @@ static int multipart_buffer_headers(multipart_buffer *self, zend_llist *header T
+ 
+ 		if (value) {
+ 			*value = 0;
+-			do { value++; } while(isspace(*value));
++
++			/* Keep only headers we use, and ignore duplicates */
++			if (!php_mime_should_save_hdr(key)
++					|| php_mime_get_hdr_value(*header, key)) {
++				skip = 1;
++				continue;
++			}
++			skip = 0;
++
++			do { value++; } while(isspace((unsigned char)*value));
+ 
+ 			entry.value = estrdup(value);
+ 			entry.key = estrdup(key);
+ 
++		} else if (skip) {
++			/* Continuation line of a header we do not keep */
++			continue;
+ 		} else if (zend_llist_count(header)) { /* If no ':' on the line, add to previous line */
+ 
+ 			prev_len = strlen(prev_entry.value);
+@@ -583,11 +628,11 @@ static char *php_ap_getword(char **line, char stop)
+ }
+ 
+ 
+-static char *substring_conf(char *start, int len, char quote TSRMLS_DC)
++static char *substring_conf(char *start, size_t len, char quote TSRMLS_DC)
+ {
+ 	char *result = emalloc(len + 2);
+ 	char *resp = result;
+-	int i;
++	size_t i;
+ 
+ 	for (i = 0; i < len; ++i) {
+ 		if (start[i] == '\\' && (start[i + 1] == '\\' || (quote && start[i + 1] == quote))) {
+@@ -652,7 +697,7 @@ look_for_quote:
+ 			}
+ 		}
+ 
+-		res = substring_conf(str + 1, strend - str - 1, quote TSRMLS_CC);
++		res = substring_conf(str + 1, (size_t)(strend - str - 1), quote TSRMLS_CC);
+ 
+ 		if (*strend == quote) {
+ 			++strend;
+@@ -664,7 +709,7 @@ look_for_quote:
+ 		while (*strend && !isspace(*strend)) {
+ 			++strend;
+ 		}
+-		res = substring_conf(str, strend - str, 0 TSRMLS_CC);
++		res = substring_conf(str, (size_t)(strend - str), 0 TSRMLS_CC);
+ 	}
+ 
+ 	while (*strend && isspace(*strend)) {
+@@ -781,6 +826,8 @@ SAPI_API SAPI_POST_HANDLER_FUNC(rfc1867_post_handler)
+ 	char *temp_filename=NULL, *lbuf=NULL, *abuf=NULL;
+ 	int boundary_len=0, total_bytes=0, cancel_upload=0, is_arr_upload=0, array_len=0;
+ 	int max_file_size=0, skip_upload=0, anonindex=0, is_anonymous;
++	int body_parts_cnt = INI_INT("max_multipart_body_parts");
++	int body_parts_limit;
+ 	zval *http_post_files=NULL; HashTable *uploaded_files=NULL;
+ #if HAVE_MBSTRING && !defined(COMPILE_DL_MBSTRING)
+ 	int str_len = 0, num_vars = 0, num_vars_max = 2*10, *len_list = NULL;
+@@ -797,6 +844,12 @@ SAPI_API SAPI_POST_HANDLER_FUNC(rfc1867_post_handler)
+ 		return;
+ 	}
+ 
++	if (body_parts_cnt < 0) {
++		/* max_input_vars does not exist in this version; use its default */
++		body_parts_cnt = 1000 + 20;
++	}
++	body_parts_limit = body_parts_cnt;
++
+ 	/* Get the boundary */
+ 	boundary = strstr(content_type_dup, "boundary");
+ 	if (!boundary || !(boundary=strchr(boundary, '='))) {
+@@ -861,6 +914,11 @@ SAPI_API SAPI_POST_HANDLER_FUNC(rfc1867_post_handler)
+ 			SAFE_RETURN;
+ 		}
+ 
++		if (--body_parts_cnt < 0) {
++			sapi_module.sapi_error(E_WARNING, "Multipart body parts limit exceeded %d. To increase the limit change max_multipart_body_parts in php.ini.", body_parts_limit);
++			SAFE_RETURN;
++		}
++
+ 		if ((cd = php_mime_get_hdr_value(header, "Content-Disposition"))) {
+ 			char *pair=NULL;
+ 			int end=0;
+@@ -1239,6 +1297,12 @@ filedone:
+ 		}
+ 	}
+ 
++	/* The actual body may exceed the declared Content-Length (official
++	 * PHP 8.2.35 fix). The parser stopped reading at post_max_size above. */
++	if (SG(post_max_size) > 0 && SG(read_post_bytes) > SG(post_max_size)) {
++		sapi_module.sapi_error(E_WARNING, "Actual POST length does not match Content-Length, and exceeds %ld bytes", SG(post_max_size));
++	}
++
+ 	SAFE_RETURN;
+ }
+ 

@@ -2,8 +2,8 @@
 
 Unofficial mitigation patches for **CVE-2026-109618 / CVE-2026-109619 / CVE-2026-115560**
 ("php2shell" / session-serializer chains) covering selected end-of-life PHP branches: 5.2, 5.3, 5.4, 5.5, 5.6, 7.0,
-7.1–7.4 and 8.0–8.1. PHP 5.1.6 has a separate
-experimental hardening patch (not a confirmed CVE fix).
+7.1–7.4 and 8.0–8.1. PHP 5.0.5 and 5.1.6 have separate
+experimental hardening patches (not confirmed CVE fixes).
 
 > ⚠️ This is **not** a vendor fix and **not** a replacement for upgrading. PHP 5.2–7.0
 > and 7.1/7.2/7.3/7.4/8.0/8.1 are end-of-life. The 5.4.45/5.5.34/5.6.40/7.0/7.1/7.2/7.3/7.4/8.0/8.1
@@ -16,6 +16,7 @@ experimental hardening patch (not a confirmed CVE fix).
 
 | File | Version | Target | SHA-256 |
 |---|---|---|---|
+| `php-5.0.5-hardening.patch` | 5.0.5 | vanilla tarball (experimental hardening; no confirmed php2shell vector) | `8be1eb1b6591d479ddf47e465d6b3e800e6807521b06be2bad921291c54c3b2f` |
 | `php-5.1.6-hardening.patch` | 5.1.6 | vanilla tarball (experimental hardening; no confirmed php2shell vector) | `bf2c2c828909124a53630b87ed6d685ea59786d4e33c4e5bf113abf0ed5aacc9` |
 | `php-5.2.17-CVE-2026-109618-109619.patch` | 5.2.17 | mod_php (Apache DSO), vanilla tarball; no upload_progress in 5.2 | `1294094deffa8bd046b1a1ff0d783df1149152f61afb41ad6216eb2feb944dde` |
 | `php-5.3.3-CVE-2026-109618-109619.patch` | 5.3.3 | vanilla tarball (minimal; no upload_progress in 5.3) | `7f3216cd6d306cf44795588a278795fbaffbce72051515472898ba4f9377018f` |
@@ -48,11 +49,12 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
 
 ## Compatibility and verification notes
 
-- **PHP 5.1.6 is not a CVE fix.** The 5.1 branch predates
+- **PHP 5.0.5 and 5.1.6 are not CVE fixes.** These branches predate
   `session.upload_progress` (5.4) and the raw-key `zend_hash_str_add/update`
-  optimization associated with CVE-2026-109618 (7.3+). It is not in the published
-  affected lists. `php-5.1.6-hardening.patch` is defense-in-depth only: OOM
-  `_exit(1)`, request-state resets, multipart limits and temp-upload cleanup.
+  optimization associated with CVE-2026-109618 (7.3+). They are not in the published
+  affected lists. `php-5.0.5-hardening.patch` and `php-5.1.6-hardening.patch` are
+  defense-in-depth only: OOM `_exit(1)`, request-state resets, multipart limits and
+  temp-upload cleanup.
 - **5.4.16 stays minimal:** the current Anton enhanced 5.4 patch targets 5.4.45 and
   does not apply cleanly to 5.4.16.
 - **5.5.34** uses Anton's 5.5 enhanced-universal patch. Upstream documents it against
@@ -61,7 +63,7 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
 - **5.3.3-50.el6_10** must be applied to the prepared CentOS/OL 6.10 tree *after* the
   114 patches from the spec. It was verified with `patch -p1 --dry-run -F0` on that
   tree; no build was re-run.
-- **Build verification:** 5.1.6, 5.2.17, 5.3.3, 5.4.16 and 7.1.33 were built as CLI with
+- **Build verification:** 5.0.5, 5.1.6, 5.2.17, 5.3.3, 5.4.16 and 7.1.33 were built as CLI with
   `--enable-session` on CentOS 6 / GCC 4.4.7 (`make` clean). CGI/Apache modules were
   not re-run. 5.4.45, 5.5.34, 5.6.40 and 7.0.33 were apply-verified only in this
   sync. 7.2.34/7.3.33/7.4.33/8.0.30/8.1.34 were already byte-identical to the
@@ -76,13 +78,13 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
 - **OOM no longer unwinds the request.** Instead of `zend_error_noreturn()` /
   `zend_bailout()` (longjmp), the engine prints a fatal error and calls `_exit(1)`.
   The same applies to `safe_address` overflows, string concatenation overflow,
-  `zend_mm_panic()` and `Balloc()`. The hardened minimal 5.1.6/5.2/5.3/5.4.16 patches
+  `zend_mm_panic()` and `Balloc()`. The hardened minimal 5.0.5/5.1.6/5.2/5.3/5.4.16 patches
   unlink upload temp files before `_exit`; the enhanced backports do not carry that
   emergency cleanup, so an OOM there may leave the current request's temp files.
 - **State reset between requests:** `shutdown_executor()` clears error/exception
   handlers and `objects_store`; `main.c` clears `PG(http_globals)` and
   `modules_activated`; `SAPI.c` clears `SG(request_info)` fields. The minimal patches
-  (including 5.1.6) also null ptr-stack/stack/llist pointers after destroy.
+  (including 5.0.5/5.1.6) also null ptr-stack/stack/llist pointers after destroy.
 - **Multipart parser:** stop reading the body beyond `post_max_size` even without
   `Content-Length`; keep only `Content-Disposition`/`Content-Type`; ignore duplicates;
   `max_multipart_body_parts` limit that counts every part; `size_t` in `substring_conf`.
@@ -92,7 +94,7 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
   cause is fixed instead (progress counters as `zend_long`, no dangling `zval*`),
   so upload progress keeps working.
 - **Session hardening:** the hardened minimal patches reset `PS(id)` and, where present,
-  `PS(serializer)` between requests (5.1.6/5.2/5.3/5.4.16). The enhanced
+  `PS(serializer)` between requests (5.0.5/5.1.6/5.2/5.3/5.4.16). The enhanced
   5.4.45/5.5.34/5.6.40/7.0/7.1/7.2/7.3/7.4/8.0/8.1 patches add the upload-progress
   session fixes: a POST-supplied session id is ignored when
   `session.use_only_cookies=1`, the upload filename is sanitised (`NUL`, `|`, CR/LF
@@ -101,7 +103,7 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
   do not apply to 5.2/5.3 (no feature) or to 5.4.16 (feature disabled).
 - **`var_unserializer` hardening:** the enhanced patches bundle the fixed
   `ext/standard/var_unserializer.re`/`.c` pair, matching the 8.2.35 code, so the
-  upload-progress Chain-C decode path is patched as well. The minimal 5.1.6/5.2/5.3/5.4.16
+  upload-progress Chain-C decode path is patched as well. The minimal 5.0.5/5.1.6/5.2/5.3/5.4.16
   patches do not include that upload-progress rewrite. The separate `var_destroy()`
   unserialize UAF is not fixed by any of these patches.
 - **Serializer-mismatch hardening (CVE-2026-115560):** the enhanced patches include
@@ -145,7 +147,7 @@ catch_workers_output=yes
   go through `zend_bailout()`. The patches only change OOM and overflow paths.
 - **`_exit` skips shutdown:** shutdown functions, destructors, session writes and
   output handlers do not run. Upload temp files are removed only by the hardened
-  minimal 5.1.6/5.2/5.3/5.4.16 patches; enhanced branches may leave them. Data that would
+  minimal 5.0.5/5.1.6/5.2/5.3/5.4.16 patches; enhanced branches may leave them. Data that would
   be written during shutdown is lost on every branch.
 - **OOM kills the worker** (FPM worker or Apache child) — that amplifies DoS and
   returns 502 for legitimately heavy requests. Monitor worker restarts.

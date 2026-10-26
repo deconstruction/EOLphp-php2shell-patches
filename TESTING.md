@@ -89,6 +89,7 @@ php-cgi -q -d cgi.force_redirect=0 -d max_multipart_body_parts=1 \
 
 | Version | Patch applied | Compiled | OOM exit 1 | Multipart / limit | Notes |
 |---|---|---|---|---|---|
+| 5.0.5 | yes | yes (CLI) | not run | not run | Experimental hardening only; no confirmed php2shell vector |
 | 5.1.6 | yes | yes (CLI) | not run | not run | Experimental hardening only; no confirmed php2shell vector |
 | 5.2.17 | yes | yes | yes | yes | Apache DSO, tested on a spare Apache instance |
 | 5.3.3 | yes | yes | yes | yes | CLI+CGI, vanilla tree |
@@ -100,7 +101,7 @@ php-cgi -q -d cgi.force_redirect=0 -d max_multipart_body_parts=1 \
 | 7.1.33 | yes | yes (CLI) | not run | not run | Enhanced port; declaration hunk relocated |
 
 > The 5.3.3/5.4.16/5.4.45/5.5.34/5.6.40 rows above record builds of the earlier
-> patches. The 2026-10-26 hardened 5.1.6, 5.2.17, 5.3.3 and 5.4.16 patches, plus the 7.1.33 port, were
+> patches. The 2026-10-26 hardened 5.0.5, 5.1.6, 5.2.17, 5.3.3 and 5.4.16 patches, plus the 7.1.33 port, were
 > built as CLI on CentOS 6 / GCC 4.4.7 with `--enable-session` (`make` clean); their
 > CGI/Apache modules were not re-run. 5.1.6 has no confirmed php2shell vector; its
 > patch is experimental defense-in-depth. The 5.3.3-50.el6_10 patch was verified with

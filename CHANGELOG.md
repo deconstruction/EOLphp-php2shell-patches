@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-26 — experimental PHP 5.0.5 hardening
+
+- Added `php-5.0.5-hardening.patch`. This is **not a CVE fix**: PHP 5.0.5 predates
+  `session.upload_progress` (5.4) and the affected raw-key
+  `zend_hash_str_add/update` optimization (7.3+), and is not in the published
+  affected lists. The patch is defense-in-depth only.
+- Ported from the 5.1.6 hardening with adaptations for the older Zend/tree: OOM
+  `_exit(1)`, temp-upload cleanup, request/session/stack/llist resets, multipart
+  limits/header filtering and actual-POST-length warning.
+- Verified with `patch -p1 --dry-run -F0` on vanilla PHP 5.0.5 and built as CLI with
+  `--enable-session` on CentOS 6 / GCC 4.4.7 (`make` clean); `max_multipart_body_parts`
+  reads correctly. Runtime OOM/multipart tests were not run; CGI/Apache were not
+  rebuilt.
+
 ## 2026-10-26 — PHP 7.1.33 enhanced-universal port
 
 - Added `php-7.1.33-CVE-2026-109618-109619.patch`, based on Anton's
