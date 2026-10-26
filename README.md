@@ -25,6 +25,7 @@ experimental hardening patches (not confirmed CVE fixes).
 | `php-5.4.45-CVE-2026-109618-109619.patch` | 5.4.45 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `1e446a1562fd7040223e9551dba7f81aeff6eb8caa138fe98254128acd786c8c` |
 | `php-5.5.34-CVE-2026-109618-109619.patch` | 5.5.34 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `8084e5514995bea5d635cc6637159168478d020403e685a1cd5b2af780a1e547` |
 | `php-5.6.40-CVE-2026-109618-109619.patch` | 5.6.40 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `35c8fb03fb6503d0182fa9964dad6c701a7797cb654593fcf7bd5183e8cee1ba` |
+| `php-7.0.5-CVE-2026-109618-109619.patch` | 7.0.5 | vanilla tarball (proactive port of the 7.0.33 enhanced backport) | `1c843a221574d3c76dabd803b063314eb9ae6c2724fa93de8e45ec07f21f262c` |
 | `php-7.0.33-CVE-2026-109618-109619.patch` | 7.0.33 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `28ce9a75054c86a1425cbfb81897d671c2ae85f8635c62ae0ece506dea2015fa` |
 | `php-7.1.33-CVE-2026-109618-109619.patch` | 7.1.33 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `2cd4d089bcf51d28bf180ac8f916d73fecf79dd07010563ba35b30fc31b8faae` |
 | `php-7.2.34-CVE-2026-109618-109619.patch` | 7.2.34 | vanilla tarball (enhanced universal backport, 8.2.35 parity) | `cd2e30e705e9b0fdd9c6e51b8e7791985482050d78b9e8eb70c8e66dfb4bce2e` |
@@ -70,6 +71,11 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
 - **5.3.3-50.el6_10** must be applied to the prepared CentOS/OL 6.10 tree *after* the
   114 patches from the spec. It was verified with `patch -p1 --dry-run -F0` on that
   tree; no build was re-run.
+- **7.0.5** is a proactive backport of the 7.0.33 enhanced-universal patch. The
+  7.0.5 tree lacks the two `zend_safe_address_guarded` functions that the 7.0.33
+  patch adjusts, so those two hunks are intentionally omitted; the session
+  `rfc1867_cleanup` logic was adapted to the 7.0.5 layout. It applies with
+  `patch -p1 -F0` and was built as CLI with `--enable-session`.
 - **Build verification:** 5.0.5, 5.0.5, 5.1.6, 5.2.17, 5.3.3, 5.4.16 and 7.1.33 were built as CLI with
   `--enable-session` on CentOS 6 / GCC 4.4.7 (`make` clean). CGI/Apache modules were
   not re-run. 5.4.45, 5.5.34, 5.6.40 and 7.0.33 were apply-verified only in this

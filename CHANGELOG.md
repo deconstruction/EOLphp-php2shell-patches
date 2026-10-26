@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-26 — proactive PHP 7.0.5 backport
+
+- Added `php-7.0.5-CVE-2026-109618-109619.patch`, adapted from the 7.0.33
+  enhanced-universal patch. PHP 7.0 is not in the published affected lists; this is
+  a proactive backport, not an official fix.
+- The 7.0.5 tree does not contain the two `zend_safe_address_guarded` helpers that
+  the 7.0.33 patch adjusts, so those two hunks were intentionally omitted. The
+  session `rfc1867_cleanup` block was adapted to the 7.0.5 layout.
+- Applies to vanilla `php-7.0.5` with `patch -p1 -F0`; built as CLI with
+  `--enable-session` on CentOS 6 / GCC 4.4.7 (`make` clean). Runtime OOM/multipart
+  tests were not run; CGI/Apache were not rebuilt.
+
 ## 2026-10-26 — separate OPcache patch for PHP 8.1.34
 
 - Added `php-8.1.34-opcache.patch`, extracted from the official PHP

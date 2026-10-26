@@ -98,12 +98,13 @@ php-cgi -q -d cgi.force_redirect=0 -d max_multipart_body_parts=1 \
 | 5.4.45 | yes | yes | yes | yes | CLI+CGI; later built as an Apache module and smoke-tested on live sites |
 | 5.5.34 | yes | yes | yes | yes | CLI+CGI |
 | 5.6.40 | yes | yes | yes | yes | CLI+CGI, FPM build, spare-port FPM test |
+| 7.0.5 | yes | yes (CLI) | not run | not run | Proactive 7.0.33 backport; absent-func hunks skipped |
 | 7.1.33 | yes | yes (CLI) | not run | not run | Enhanced port; declaration hunk relocated |
 | 8.1.34 + OPcache | yes | yes (CLI, JIT off) | not run | not run | Official OPcache patch; apply with core |
 
 > The 5.0.5/5.1.6/5.3.3/5.4.16/5.4.45/5.5.34/5.6.40 rows above record builds of
 > earlier or experimental patches. The 2026-10-26 hardened 5.0.5, 5.1.6, 5.2.17,
-> 5.3.3 and 5.4.16 patches, plus the 7.1.33 port, were built as CLI on CentOS 6 /
+> 5.3.3 and 5.4.16 patches, plus the 7.0.5 and 7.1.33 ports, were built as CLI on CentOS 6 /
 > GCC 4.4.7 with `--enable-session` (`make` clean); their CGI/Apache modules were
 > not re-run.
 > The 8.1.34 core + OPcache combination was built as CLI with
