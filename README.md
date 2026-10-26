@@ -1,7 +1,7 @@
 # EOLphp-php2shell-patches
 
-Unofficial mitigation patches for **CVE-2026-109618 / CVE-2026-109619** ("php2shell")
-covering selected end-of-life PHP branches: 5.2, 5.3, 5.4, 5.5, 5.6, 7.0,
+Unofficial mitigation patches for **CVE-2026-109618 / CVE-2026-109619 / CVE-2026-115560**
+("php2shell" / session-serializer chains) covering selected end-of-life PHP branches: 5.2, 5.3, 5.4, 5.5, 5.6, 7.0,
 7.2–7.4 and 8.0–8.1. **PHP 7.1 is not covered.** PHP 5.1.6 has a separate
 experimental hardening patch (not a confirmed CVE fix).
 
@@ -38,8 +38,9 @@ Patches apply to the official `php-<version>.tar.gz` tarballs
 [Anton-Barinov/php2shell-patches](https://github.com/Anton-Barinov/php2shell-patches)
 (verified against the vanilla tarballs listed above); they carry the official OOM
 fix plus the root-cause upload_progress fix, so upload progress bars keep working.
-The enhanced files were taken from Anton-Barinov/php2shell-patches at commit
-`4c2438b` (2026-10-25); 7.2.34/7.3.33/7.4.33/8.0.30/8.1.34 were already identical.
+The enhanced files match Anton-Barinov/php2shell-patches current at `6436594`
+(2026-10-26; patch files unchanged since `4c2438b`); 7.2.34/7.3.33/7.4.33/8.0.30/8.1.34
+were already identical.
 The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
 `session.upload_progress` feature to disable; 5.4.16 disables it (see below).
 
@@ -98,6 +99,11 @@ The 5.2/5.3/5.4.16 patches remain the minimal mitigations. 5.2/5.3 have no
   upload-progress Chain-C decode path is patched as well. The minimal 5.1.6/5.2/5.3/5.4.16
   patches do not include that upload-progress rewrite. The separate `var_destroy()`
   unserialize UAF is not fixed by any of these patches.
+- **Serializer-mismatch hardening (CVE-2026-115560):** the enhanced patches include
+  the delimiter/filename sanitisation, `PS(serializer)` reset and
+  incomplete-class-only decode restrictions. The minimal 5.4.16 patch blocks the
+  confirmed path by disabling `session.upload_progress`; 5.1/5.2/5.3 do not have
+  that feature at all.
 
 Details: [README-CVE-2026-109618-109619.md](README-CVE-2026-109618-109619.md).
 Testing methodology and per-branch results: [TESTING.md](TESTING.md).

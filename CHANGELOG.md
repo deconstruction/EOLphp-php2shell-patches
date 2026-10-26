@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-26 — audit against Anton current (6436594) and CVE-2026-115560
+
+- Re-fetched Anton-Barinov/php2shell-patches. Since `4c2438b` there are no patch-file
+  changes; only documentation and the `php2shell-check` audit utility were added.
+  All enhanced root patches in this repository are byte-identical to Anton current
+  (`5.4.45` through `8.1.34`).
+- Documented CVE-2026-115560 (session-serializer RCE): the enhanced patches already
+  contain the delimiter/filename sanitisation, `PS(serializer)` reset and
+  incomplete-class-only decode restrictions; the 5.4.16 minimal patch blocks the
+  confirmed path by disabling `session.upload_progress`; 5.1/5.2/5.3 have no
+  upload-progress feature.
+- 7.1 remains intentionally uncovered. No patch files were changed by this audit.
+
 ## 2026-10-26 — experimental PHP 5.1.6 hardening
 
 - Added `php-5.1.6-hardening.patch`. This is **not a CVE fix**: PHP 5.1 predates
